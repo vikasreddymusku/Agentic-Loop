@@ -9,7 +9,7 @@ The long-term goal is to build a scraper that can detect extraction failures, ad
 The intended flow is:
 
 ```text
-User Request
+Agent Request
     ↓
 Scrape Job
     ↓
@@ -95,7 +95,7 @@ FieldMatcher
 FieldExtraction[]
 ```
 
-Its job is to determine which discovered website property matches the field requested by the user.
+Its job is to determine which discovered website property matches the field requested by the Agent.
 
 Example:
 
@@ -160,7 +160,7 @@ JSON-LD / Meta / Microdata
 DiscoveredProperty[]
 ```
 
-The next work is turning those discovered properties into the **actual fields requested by the user**.
+The next work is turning those discovered properties into the **actual fields requested by the Agent**.
 
 ---
 
@@ -210,7 +210,7 @@ Full system achitecture
 ```mermaid
 
 flowchart TD
-    A["User Scrape Request"]
+    A["Agent Scrape Request"]
     B["ScrapeJob<br/>RequestedField[]"]
     C["RequestManager"]
     D["Crawlee RequestQueue"]
