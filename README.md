@@ -2143,3 +2143,82 @@ All three should remain green.
 No license has been specified yet.
 
 Add the repository's actual license here when one is selected.
+
+```mermaid
+flowchart TD
+    A["User Scrape Request"]
+    B["ScrapeJob<br/>RequestedField[]"]
+    C["RequestManager"]
+    D["Crawlee RequestQueue"]
+    E["BasicCrawler"]
+    F["Coordinator"]
+    G["AccessController"]
+    H{"Access Decision"}
+
+    R1["RETRY_LATER"]
+    R2["USER_ACTION_REQUIRED"]
+    R3["DENY"]
+
+    I["FastFetcher"]
+    J["FetchEnvelope"]
+
+    K["JSON-LD Extractor"]
+    L["Meta Extractor"]
+    M["Microdata Extractor"]
+
+    N["DiscoveredProperty[]"]
+
+    O["FieldMatcher<br/>🚧 In Progress"]
+    P["FieldExtraction[]"]
+    Q["FieldResolver<br/>📌 Planned"]
+    R["Normalizer<br/>📌 Planned"]
+    S["Validator<br/>📌 Planned"]
+
+    T{"Validation Result"}
+    U["SUCCESS"]
+
+    V["Playwright / DOM Evidence<br/>📌 Planned"]
+    W["Self-Healing Engine<br/>📌 Planned"]
+    X["Generated Parser Configuration<br/>📌 Planned"]
+    Y["Deterministic Validation<br/>📌 Planned"]
+    Z["Version / Promotion<br/>📌 Planned"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+
+    H -->|ALLOW| I
+    H -->|RETRY_LATER| R1
+    H -->|USER_ACTION_REQUIRED| R2
+    H -->|DENY| R3
+
+    I --> J
+
+    J --> K
+    J --> L
+    J --> M
+
+    K --> N
+    L --> N
+    M --> N
+
+    N --> O
+    O --> P
+    P --> Q
+    Q --> R
+    R --> S
+    S --> T
+
+    T -->|PASS| U
+    T -->|Extraction failure| V
+
+    V --> W
+    W --> X
+    X --> Y
+    Y -->|PASS| Z
+    Y -->|FAIL| W
+```
