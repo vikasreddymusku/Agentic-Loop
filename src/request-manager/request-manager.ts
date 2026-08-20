@@ -55,7 +55,7 @@ import {
  * - validation
  * - AI healing
  */
-export class ScrapeRequestManager {
+export class RequestManager {
 
     private queue:
         RequestQueue | null = null;
@@ -1042,6 +1042,70 @@ export class ScrapeRequestManager {
         state.updatedAt =
             new Date()
                 .toISOString();
+    }
+
+    /**
+ * The page was accessed successfully, but the
+ * deterministic parser pipeline could not satisfy
+ * the requested schema.
+ *
+ * This is intentionally separate from:
+ *
+ * - FAILED_FINAL
+ * - RETRYING
+ * - RETRY_SCHEDULED
+ *
+ * Parser recovery / self-healing policy will be
+ * added later.
+ *
+ * This method only updates application lifecycle
+ * state. It does not perform queue operations.
+ */
+    markParserFailed(
+        request:
+            Request<QueuedScrapeJob>,
+
+        message:
+            string,
+    ): void {
+
+        const state =
+            request
+                .userData
+                .state;
+
+
+        state.status =
+            'PARSER_FAILED';
+
+
+        state.lastError =
+            message;
+
+
+    /**
+     * Do NOT modify:
+     *
+     * - attempt
+     * - deferredRetryCount
+     * - lastAccessReason
+     *
+     * AccessController and parser failure state are
+     * separate concerns.
+     */
+        state.updatedAt =
+            new Date()
+                .toISOString();
+
+
+        console.error(
+            `[RequestManager] PARSER_FAILED `
+            + request
+                .userData
+                .job
+                .id
+            + `: ${message}`,
+        );
     }
 
 

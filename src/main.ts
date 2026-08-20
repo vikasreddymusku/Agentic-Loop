@@ -21,7 +21,7 @@ import {
 
 
 import {
-    ScrapeRequestManager,
+    RequestManager,
 } from './request-manager/request-manager.js';
 
 import type {
@@ -118,7 +118,7 @@ async function main():
      * ------------------------------------------------
      */
     const requestManager =
-        new ScrapeRequestManager();
+        new RequestManager();
 
 
     await requestManager

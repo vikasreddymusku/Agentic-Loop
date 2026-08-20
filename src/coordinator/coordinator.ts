@@ -25,7 +25,7 @@ import type {
 } from '../request-manager/types.js';
 
 import type {
-    ScrapeRequestManager,
+    RequestManager,
 } from '../request-manager/request-manager.js';
 
 import type {
@@ -50,7 +50,7 @@ import type {
  */
 type RequestManagerPort =
     Pick<
-        ScrapeRequestManager,
+        RequestManager,
         | 'markProcessing'
         | 'markRetryScheduled'
         | 'markUserActionRequired'

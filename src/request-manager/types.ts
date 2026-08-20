@@ -16,6 +16,7 @@ export type ScrapeJobStatus =
     | 'RETRY_SCHEDULED'
     | 'USER_ACTION_REQUIRED'
     | 'READY_FOR_PARSING'
+    | 'PARSER_FAILED'
     | 'SUCCESS'
     | 'FAILED_FINAL';
 
