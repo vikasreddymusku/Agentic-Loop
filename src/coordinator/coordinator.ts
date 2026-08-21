@@ -17,6 +17,14 @@ import type {
 } from '../core/contracts/fetch-envelope.js';
 
 import type {
+    ParserOutcomePolicy,
+} from '../core/contracts/parser/parser-outcome-policy.js';
+
+import type {
+    ParserPipeline,
+} from '../core/contracts/parser/parser-pipeline.js';
+
+import type {
     FastFetcher,
 } from '../fetcher/fast-fetcher.js';
 
@@ -44,9 +52,6 @@ import type {
 /**
  * Coordinator only needs a subset of
  * RequestManager functionality.
- *
- * Keeping the dependency narrow makes the
- * Coordinator easier to test.
  */
 type RequestManagerPort =
     Pick<
@@ -55,6 +60,8 @@ type RequestManagerPort =
         | 'markRetryScheduled'
         | 'markUserActionRequired'
         | 'markReadyForParsing'
+        | 'markSuccess'
+        | 'markParserFailed'
         | 'markFailed'
     >;
 
@@ -63,6 +70,20 @@ type FastFetcherPort =
     Pick<
         FastFetcher,
         'fetch'
+    >;
+
+
+type ParserPipelinePort =
+    Pick<
+        ParserPipeline,
+        'run'
+    >;
+
+
+type ParserOutcomePolicyPort =
+    Pick<
+        ParserOutcomePolicy,
+        'decide'
     >;
 
 
@@ -98,6 +119,12 @@ export class Coordinator {
         private readonly pendingActions:
             PendingActionStore,
 
+        private readonly parserPipeline:
+            ParserPipelinePort,
+
+        private readonly parserOutcomePolicy:
+            ParserOutcomePolicyPort,
+
         options:
             CoordinatorOptions = {},
     ) {
@@ -109,7 +136,7 @@ export class Coordinator {
 
 
     /**
-     * Process ONE Crawlee request.
+     * Process one Crawlee request.
      *
      * BasicCrawler owns:
      *
@@ -120,10 +147,11 @@ export class Coordinator {
      * Coordinator owns:
      *
      * - access orchestration
-     * - policy decision routing
+     * - access-policy routing
      * - deferred retry scheduling
      * - user-action persistence
-     * - final access-layer state
+     * - parser execution
+     * - parser outcome routing
      */
     async handle(
         request:
@@ -139,8 +167,8 @@ export class Coordinator {
 
 
         /**
-         * Every actual logical execution increments
-         * state.attempt here.
+         * Every logical execution increments
+         * attempt here.
          */
         this.requestManager
             .markProcessing(
@@ -149,8 +177,8 @@ export class Coordinator {
 
 
         /**
-         * Check known cooldown/access state BEFORE
-         * performing another HTTP request.
+         * Check known access/cooldown state before
+         * performing HTTP work.
          */
         const preflight =
             await this.accessController
@@ -175,12 +203,11 @@ export class Coordinator {
 
 
         /**
-         * FastFetcher should normally convert
-         * HTTP/transport outcomes into FetchEnvelope
-         * instead of throwing.
+         * FastFetcher normally represents transport
+         * and HTTP outcomes as FetchEnvelope.
          *
-         * If an unexpected exception DOES escape,
-         * allow it to propagate to BasicCrawler.
+         * Unexpected exceptions intentionally
+         * propagate to BasicCrawler.
          */
         const envelope =
             await this.fastFetcher
@@ -190,8 +217,8 @@ export class Coordinator {
 
 
         /**
-         * Translate transport/HTTP/body evidence
-         * into an access policy decision.
+         * Convert transport/HTTP evidence into an
+         * access policy decision.
          */
         const evaluation =
             await this.accessController
@@ -216,7 +243,7 @@ export class Coordinator {
         evaluation:
             AccessEvaluation,
 
-        _envelope?:
+        envelope?:
             FetchEnvelope,
     ): Promise<void> {
 
@@ -227,19 +254,99 @@ export class Coordinator {
             case 'ALLOW':
 
                 /**
-                 * IMPORTANT:
+                 * Access ALLOW does not mean final
+                 * scrape SUCCESS.
                  *
-                 * ALLOW means ACCESS succeeded.
-                 *
-                 * It does NOT mean extraction
-                 * succeeded.
-                 *
-                 * The future parser will receive the
-                 * FetchEnvelope before SUCCESS is set.
+                 * The response must first complete the
+                 * deterministic parser pipeline.
+                 */
+                if (
+                    envelope === undefined
+                ) {
+
+                    throw new Error(
+                        'FetchEnvelope is required for parser execution.',
+                    );
+                }
+
+
+                /**
+                 * Preserve the lifecycle boundary
+                 * between successful access and
+                 * parser execution.
                  */
                 this.requestManager
                     .markReadyForParsing(
                         request,
+                    );
+
+
+                /**
+                 * Do NOT catch unexpected parser
+                 * exceptions here.
+                 *
+                 * A parser exception is different from
+                 * a valid parser result whose
+                 * validation status is INVALID.
+                 *
+                 * Unexpected exceptions should reach
+                 * BasicCrawler's normal error/retry
+                 * lifecycle.
+                 */
+                const parserResult =
+                    await this.parserPipeline
+                        .run({
+
+                            job:
+                                request
+                                    .userData
+                                    .job,
+
+                            envelope,
+                        });
+
+
+                const parserOutcome =
+                    this.parserOutcomePolicy
+                        .decide(
+                            parserResult,
+                        );
+
+
+                /**
+                 * VALID and PARTIAL both map to
+                 * COMPLETE through ParserOutcomePolicy.
+                 */
+                if (
+                    parserOutcome.outcome
+                    === 'COMPLETE'
+                ) {
+
+                    this.requestManager
+                        .markSuccess(
+                            request,
+                        );
+
+
+                    return;
+                }
+
+
+                /**
+                 * PARSER_FAILURE represents a
+                 * completed deterministic pipeline
+                 * whose result did not satisfy
+                 * validation requirements.
+                 *
+                 * No retry/self-healing happens here.
+                 */
+                this.requestManager
+                    .markParserFailed(
+                        request,
+
+                        `Parser validation failed `
+                        + `with status `
+                        + `${parserResult.validation.status}.`,
                     );
 
 
@@ -342,11 +449,8 @@ export class Coordinator {
 
 
         /**
-         * markProcessing() has already incremented
-         * state.attempt for the current execution.
-         *
-         * If the maximum has already been reached,
-         * do NOT create another deferred retry.
+         * markProcessing() already incremented
+         * state.attempt for this execution.
          */
         if (
             state.attempt
@@ -421,13 +525,10 @@ export class Coordinator {
 
 
         /**
-         * Scheduling is an infrastructure operation
-         * that can fail.
+         * Scheduler persistence can fail.
          *
-         * Save the previous state so we don't leave
-         * the logical job falsely marked as
-         * RETRY_SCHEDULED if the scheduler rejects
-         * the task.
+         * Preserve the previous lifecycle state so
+         * RETRY_SCHEDULED is not falsely retained.
          */
         const previousState =
             structuredClone(
@@ -445,14 +546,6 @@ export class Coordinator {
 
         const task = {
 
-            /**
-             * Snapshot AFTER markRetryScheduled so
-             * the future requeued request contains:
-             *
-             * - RETRY_SCHEDULED state history
-             * - incremented deferredRetryCount
-             * - lastAccessReason
-             */
             queuedJob:
                 structuredClone(
                     request.userData,
@@ -476,14 +569,6 @@ export class Coordinator {
             error
         ) {
 
-            /**
-             * Restore state because no deferred
-             * retry was successfully scheduled.
-             *
-             * The exception then propagates to
-             * BasicCrawler, whose errorHandler can
-             * mark this request RETRYING.
-             */
             request.userData.state =
                 previousState;
 
@@ -551,11 +636,6 @@ export class Coordinator {
 
                     /**
                      * Defensive snapshot.
-                     *
-                     * The store also clones internally,
-                     * but the Coordinator should not
-                     * expose the active Crawlee request
-                     * object as persisted state.
                      */
                     queuedJob:
                         structuredClone(
@@ -570,11 +650,9 @@ export class Coordinator {
                     createdAt,
 
                     /**
-                     * sessionRef is intentionally not
-                     * populated by FastFetcher.
-                     *
-                     * Browser/session integration will
-                     * provide this later.
+                     * sessionRef will be supplied by
+                     * future browser/session
+                     * integration when required.
                      */
                 });
 
@@ -583,8 +661,8 @@ export class Coordinator {
         ) {
 
             /**
-             * Don't claim USER_ACTION_REQUIRED was
-             * persisted if storage actually failed.
+             * USER_ACTION_REQUIRED must not remain
+             * recorded if persistence failed.
              */
             request.userData.state =
                 previousState;

@@ -14,6 +14,10 @@ import type {
 } from '../core/contracts/fetch-envelope.js';
 
 import type {
+    ParserPipelineResult,
+} from '../core/contracts/parser/parser-pipeline-result.js';
+
+import type {
     QueuedScrapeJob,
 } from '../request-manager/types.js';
 
@@ -43,9 +47,10 @@ function createRequest(
                     {
                         name:
                             'businessName',
+
                         type:
-                            'string',  
-                    }
+                            'string',
+                    },
                 ],
 
                 maxRetries,
@@ -72,6 +77,7 @@ function createRequest(
                     '2026-08-19T10:00:00.000Z',
             },
         },
+
     } as unknown as Request<QueuedScrapeJob>;
 }
 
@@ -110,6 +116,80 @@ const ENVELOPE:
     };
 
 
+function createParserResult(
+    validationStatus:
+        'VALID'
+        | 'PARTIAL'
+        | 'INVALID' =
+        'VALID',
+): ParserPipelineResult {
+
+    /**
+     * Coordinator does not inspect the internal
+     * extraction/resolution/normalization contents.
+     *
+     * Those stages have their own unit tests.
+     *
+     * This test helper only needs a contract-shaped
+     * pipeline result for Coordinator routing.
+     */
+    return {
+
+        jobId:
+            'job-1',
+
+        extraction:
+            {},
+
+        resolved:
+            {},
+
+        normalized:
+            {},
+
+        validation: {
+
+            jobId:
+                'job-1',
+
+            status:
+                validationStatus,
+
+            validated:
+                {},
+
+            validFields:
+                validationStatus === 'INVALID'
+                    ? []
+                    : [
+                        'businessName',
+                    ],
+
+            invalidFields:
+                validationStatus === 'INVALID'
+                    ? [
+                        'businessName',
+                    ]
+                    : [],
+
+            missingFields:
+                validationStatus === 'INVALID'
+                    ? [
+                        'businessName',
+                    ]
+                    : [],
+
+            issues:
+                [],
+
+            warnings:
+                [],
+        },
+
+    } as unknown as ParserPipelineResult;
+}
+
+
 function createDependencies() {
 
     const requestManager = {
@@ -128,6 +208,7 @@ function createDependencies() {
                         1;
                 },
             ),
+
 
         markRetryScheduled:
             vi.fn(
@@ -159,6 +240,7 @@ function createDependencies() {
                 },
             ),
 
+
         markUserActionRequired:
             vi.fn(
                 (
@@ -185,6 +267,7 @@ function createDependencies() {
                 },
             ),
 
+
         markReadyForParsing:
             vi.fn(
                 (
@@ -196,6 +279,46 @@ function createDependencies() {
                         'READY_FOR_PARSING';
                 },
             ),
+
+
+        markSuccess:
+            vi.fn(
+                (
+                    request:
+                        Request<QueuedScrapeJob>,
+                ) => {
+
+                    request.userData.state.status =
+                        'SUCCESS';
+
+                    request.userData.state.lastError =
+                        undefined;
+
+                    request.userData.state
+                        .lastAccessReason =
+                        undefined;
+                },
+            ),
+
+
+        markParserFailed:
+            vi.fn(
+                (
+                    request:
+                        Request<QueuedScrapeJob>,
+
+                    message:
+                        string,
+                ) => {
+
+                    request.userData.state.status =
+                        'PARSER_FAILED';
+
+                    request.userData.state.lastError =
+                        message;
+                },
+            ),
+
 
         markFailed:
             vi.fn(
@@ -297,12 +420,43 @@ function createDependencies() {
     };
 
 
+    const parserResult =
+        createParserResult();
+
+
+    const parserPipeline = {
+
+        run:
+            vi.fn()
+                .mockResolvedValue(
+                    parserResult,
+                ),
+    };
+
+
+    const parserOutcomePolicy = {
+
+        decide:
+            vi.fn()
+                .mockReturnValue({
+                    outcome:
+                        'COMPLETE',
+
+                    quality:
+                        'FULL',
+                }),
+    };
+
+
     return {
         requestManager,
         fastFetcher,
         accessController,
         retryScheduler,
         pendingActions,
+        parserPipeline,
+        parserOutcomePolicy,
+        parserResult,
     };
 }
 
@@ -312,7 +466,7 @@ describe(
     () => {
 
         it(
-            'moves successful access to READY_FOR_PARSING',
+            'moves successful access through READY_FOR_PARSING before parser completion',
             async () => {
 
                 const deps =
@@ -326,6 +480,8 @@ describe(
                         deps.accessController,
                         deps.retryScheduler,
                         deps.pendingActions,
+                        deps.parserPipeline,
+                        deps.parserOutcomePolicy,
                     );
 
 
@@ -361,9 +517,196 @@ describe(
 
 
                 expect(
+                    deps.parserPipeline.run,
+                ).toHaveBeenCalledOnce();
+
+
+                expect(
+                    deps.requestManager
+                        .markReadyForParsing
+                        .mock
+                        .invocationCallOrder[0]!,
+                ).toBeLessThan(
+                    deps.parserPipeline
+                        .run
+                        .mock
+                        .invocationCallOrder[0]!,
+                );
+
+
+                expect(
                     request.userData.state.status,
                 ).toBe(
-                    'READY_FOR_PARSING',
+                    'SUCCESS',
+                );
+            },
+        );
+
+
+        it(
+            'calls parser pipeline and marks SUCCESS when outcome is COMPLETE',
+            async () => {
+
+                const deps =
+                    createDependencies();
+
+
+                const coordinator =
+                    new Coordinator(
+                        deps.requestManager,
+                        deps.fastFetcher,
+                        deps.accessController,
+                        deps.retryScheduler,
+                        deps.pendingActions,
+                        deps.parserPipeline,
+                        deps.parserOutcomePolicy,
+                    );
+
+
+                const request =
+                    createRequest();
+
+
+                await coordinator.handle(
+                    request,
+                );
+
+
+                expect(
+                    deps.parserPipeline.run,
+                ).toHaveBeenCalledOnce();
+
+
+                expect(
+                    deps.parserPipeline.run,
+                ).toHaveBeenCalledWith({
+
+                    job:
+                        request.userData.job,
+
+                    envelope:
+                        ENVELOPE,
+                });
+
+
+                expect(
+                    deps.parserOutcomePolicy.decide,
+                ).toHaveBeenCalledOnce();
+
+
+                expect(
+                    deps.parserOutcomePolicy.decide,
+                ).toHaveBeenCalledWith(
+                    deps.parserResult,
+                );
+
+
+                expect(
+                    deps.requestManager.markSuccess,
+                ).toHaveBeenCalledOnce();
+
+
+                expect(
+                    deps.requestManager
+                        .markParserFailed,
+                ).not.toHaveBeenCalled();
+
+
+                expect(
+                    request.userData.state.status,
+                ).toBe(
+                    'SUCCESS',
+                );
+            },
+        );
+
+
+        it(
+            'calls parser pipeline and marks PARSER_FAILED when outcome is PARSER_FAILURE',
+            async () => {
+
+                const deps =
+                    createDependencies();
+
+
+                const failedParserResult =
+                    createParserResult(
+                        'INVALID',
+                    );
+
+
+                deps.parserPipeline
+                    .run
+                    .mockResolvedValue(
+                        failedParserResult,
+                    );
+
+
+                deps.parserOutcomePolicy
+                    .decide
+                    .mockReturnValue({
+                        outcome:
+                            'PARSER_FAILURE',
+                    });
+
+
+                const coordinator =
+                    new Coordinator(
+                        deps.requestManager,
+                        deps.fastFetcher,
+                        deps.accessController,
+                        deps.retryScheduler,
+                        deps.pendingActions,
+                        deps.parserPipeline,
+                        deps.parserOutcomePolicy,
+                    );
+
+
+                const request =
+                    createRequest();
+
+
+                await coordinator.handle(
+                    request,
+                );
+
+
+                expect(
+                    deps.parserPipeline.run,
+                ).toHaveBeenCalledOnce();
+
+
+                expect(
+                    deps.parserOutcomePolicy.decide,
+                ).toHaveBeenCalledWith(
+                    failedParserResult,
+                );
+
+
+                expect(
+                    deps.requestManager
+                        .markParserFailed,
+                ).toHaveBeenCalledOnce();
+
+
+                expect(
+                    deps.requestManager
+                        .markParserFailed,
+                ).toHaveBeenCalledWith(
+                    request,
+                    'Parser validation failed with status INVALID.',
+                );
+
+
+                expect(
+                    deps.requestManager.markSuccess,
+                ).not.toHaveBeenCalled();
+
+
+                expect(
+                    request.userData.state.status,
+                ).toBe(
+                    'PARSER_FAILED',
                 );
             },
         );
@@ -380,6 +723,7 @@ describe(
                 deps.accessController
                     .preflight
                     .mockResolvedValue({
+
                         decision:
                             'RETRY_LATER',
 
@@ -401,6 +745,8 @@ describe(
                         deps.accessController,
                         deps.retryScheduler,
                         deps.pendingActions,
+                        deps.parserPipeline,
+                        deps.parserOutcomePolicy,
                         {
                             now:
                                 () =>
@@ -418,6 +764,11 @@ describe(
 
                 expect(
                     deps.fastFetcher.fetch,
+                ).not.toHaveBeenCalled();
+
+
+                expect(
+                    deps.parserPipeline.run,
                 ).not.toHaveBeenCalled();
 
 
@@ -453,6 +804,7 @@ describe(
                 deps.accessController
                     .preflight
                     .mockResolvedValue({
+
                         decision:
                             'USER_ACTION_REQUIRED',
 
@@ -477,6 +829,8 @@ describe(
                         deps.accessController,
                         deps.retryScheduler,
                         deps.pendingActions,
+                        deps.parserPipeline,
+                        deps.parserOutcomePolicy,
                     );
 
 
@@ -487,6 +841,11 @@ describe(
 
                 expect(
                     deps.fastFetcher.fetch,
+                ).not.toHaveBeenCalled();
+
+
+                expect(
+                    deps.parserPipeline.run,
                 ).not.toHaveBeenCalled();
 
 
@@ -514,6 +873,7 @@ describe(
                 deps.accessController
                     .evaluate
                     .mockResolvedValue({
+
                         decision:
                             'DENY',
 
@@ -532,6 +892,8 @@ describe(
                         deps.accessController,
                         deps.retryScheduler,
                         deps.pendingActions,
+                        deps.parserPipeline,
+                        deps.parserOutcomePolicy,
                     );
 
 
@@ -547,6 +909,11 @@ describe(
                 expect(
                     deps.requestManager.markFailed,
                 ).toHaveBeenCalledOnce();
+
+
+                expect(
+                    deps.parserPipeline.run,
+                ).not.toHaveBeenCalled();
 
 
                 expect(
@@ -577,6 +944,7 @@ describe(
                 deps.accessController
                     .evaluate
                     .mockResolvedValue({
+
                         decision:
                             'RETRY_LATER',
 
@@ -609,6 +977,8 @@ describe(
                         deps.accessController,
                         deps.retryScheduler,
                         deps.pendingActions,
+                        deps.parserPipeline,
+                        deps.parserOutcomePolicy,
                     );
 
 
@@ -626,6 +996,11 @@ describe(
 
                 expect(
                     deps.retryScheduler.schedule,
+                ).not.toHaveBeenCalled();
+
+
+                expect(
+                    deps.parserPipeline.run,
                 ).not.toHaveBeenCalled();
 
 
@@ -654,6 +1029,7 @@ describe(
                 deps.accessController
                     .evaluate
                     .mockResolvedValue({
+
                         decision:
                             'RETRY_LATER',
 
@@ -688,6 +1064,8 @@ describe(
                         deps.accessController,
                         deps.retryScheduler,
                         deps.pendingActions,
+                        deps.parserPipeline,
+                        deps.parserOutcomePolicy,
                     );
 
 
@@ -701,10 +1079,10 @@ describe(
 
 
                 /**
-                 * markProcessing already happened.
+                 * markProcessing already occurred.
                  *
-                 * The RETRY_SCHEDULED mutation should
-                 * have been rolled back.
+                 * RETRY_SCHEDULED must have been
+                 * rolled back after scheduler failure.
                  */
                 expect(
                     request.userData.state.status,
@@ -719,6 +1097,11 @@ describe(
                 ).toBe(
                     0,
                 );
+
+
+                expect(
+                    deps.parserPipeline.run,
+                ).not.toHaveBeenCalled();
             },
         );
     },

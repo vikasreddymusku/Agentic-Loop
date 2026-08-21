@@ -2,7 +2,8 @@ export type ExtractionSource =
     | 'JSON_LD'
     | 'MICRODATA'
     | 'META'
-    | 'DOM';
+    | 'DOM'
+    | 'NETWORK';
 
 
 export type ExtractionVocabulary =

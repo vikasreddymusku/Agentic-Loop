@@ -94,6 +94,52 @@ import {
     Coordinator,
 } from './coordinator/coordinator.js';
 
+import {
+    JsonLdExtractor,
+} from './parser/extractors/json-ld.extractor.js';
+
+import {
+    MetaExtractor,
+} from './parser/extractors/meta.extractor.js';
+
+import {
+    MicrodataExtractor,
+} from './parser/extractors/microdata.extractor.js';
+
+import {
+    DomExtractor,
+} from './parser/extractors/dom.extractor.js';
+
+import {
+    DefaultFieldMatcher,
+} from './parser/matchers/default-field-matcher.js';
+
+import {
+    ParserOrchestrator,
+} from './parser/orchestrator/parser-orchestrator.js';
+
+import {
+    DefaultFieldResolver,
+} from './parser/resolvers/default-field-resolver.js';
+
+import {
+    DefaultNormalizer,
+} from './parser/normalizers/default-normalizer.js';
+
+import {
+    DefaultValidator,
+} from './parser/validators/default-validator.js';
+
+import {
+    DefaultParserPipeline,
+} from './parser/pipeline/default-parser-pipeline.js';
+
+import {
+    DefaultParserOutcomePolicy,
+} from './parser/policies/default-parser-outcome-policy.js';
+
+
+
 
 async function main():
     Promise<void> {
@@ -242,6 +288,46 @@ async function main():
     const pendingActionStore =
         new InMemoryPendingActionStore();
 
+    const fieldMatcher =
+    new DefaultFieldMatcher();
+
+
+    const parserOrchestrator =
+        new ParserOrchestrator(
+            [
+                new JsonLdExtractor(),
+                new MetaExtractor(),
+                new MicrodataExtractor(),
+                new DomExtractor(),
+            ],
+            fieldMatcher,
+        );
+
+
+    const fieldResolver =
+            new DefaultFieldResolver();
+
+
+    const normalizer =
+        new DefaultNormalizer();
+
+
+    const validator =
+        new DefaultValidator();
+
+
+    const parserPipeline =
+        new DefaultParserPipeline(
+            parserOrchestrator,
+            fieldResolver,
+            normalizer,
+            validator,
+        );
+
+
+    const parserOutcomePolicy =
+        new DefaultParserOutcomePolicy();
+
 
     /**
      * ------------------------------------------------
@@ -254,14 +340,12 @@ async function main():
         new Coordinator(
 
             requestManager,
-
             fastFetcher,
-
             accessController,
-
             retryScheduler,
-
             pendingActionStore,
+            parserPipeline,
+            parserOutcomePolicy,
         );
 
 

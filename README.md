@@ -1,16 +1,13 @@
-# Agentic Loop – Universal Adaptive Web Scraping Engine
+Agentic Loop – Universal Adaptive Web Scraping Engine
 
-Agentic Loop is a **universal, adaptive web scraping engine** designed to scrape different websites and dynamically extract whatever fields the user requests.
+Agentic Loop is a universal, adaptive web scraping engine designed to scrape different websites and dynamically extract whatever fields the user requests.
 
-The long-term goal is to build a scraper that can detect extraction failures, classify them correctly, adapt to website changes, validate generated fixes, and eventually **self-heal automatically**.
+The long-term goal is to build a scraper that can detect extraction failures, classify them correctly, adapt to website changes, validate generated fixes, and eventually self-heal automatically.
 
-> The deterministic scraping pipeline is being built first. AI/self-healing will be added only after the extraction, validation, and failure-classification layers are reliable.
+Core principle: Deterministic first. AI last. Validate before promotion.
 
----
+What I Am Building
 
-## What I Am Building
-
-```text
 Agent Request
     ↓
 ScrapeJob + RequestedField[]
@@ -29,7 +26,11 @@ FastFetcher
     ↓
 FetchEnvelope
     ↓
-Structured Data Extraction
+Deterministic Parser Pipeline
+    ├─ JSON-LD
+    ├─ Meta
+    ├─ Microdata
+    └─ DOM
     ↓
 Field Matching
     ↓
@@ -42,172 +43,179 @@ Validation
 Parser Outcome Policy
     ↓
 SUCCESS / PARSER_FAILED
+
+Dynamic evidence path:
+
+PlaywrightRenderer
+    ↓
+Rendered DOM + Browser Network Evidence
+    ├─ HTML / DOM
+    └─ XHR / Fetch responses
+    ↓
+Future Network/API Extractor
     ↓
 Future Failure Classification
     ↓
 Future Self-Healing
-```
 
 The system is designed to support:
 
-- Job websites
-- E-commerce websites
-- News websites
-- Product/catalog websites
-- Public/social pages
-- Structured-data-heavy websites
-- Other websites with arbitrary requested fields
+Job websites
 
-It is **not limited to one website type or fixed business fields**.
+E-commerce websites
 
----
+News websites
 
-# Current Progress
+Product/catalog websites
 
-## ✅ Crawling & Request Foundation
+Public/social pages
+
+Structured-data-heavy websites
+
+JavaScript-heavy websites
+
+Other websites with arbitrary requested fields
+
+It is not limited to one website type or fixed business fields.
+
+Current Progress
+
+✅ Crawling & Request Foundation
 
 Implemented:
 
-- RequestManager
-- Crawlee RequestQueue
-- BasicCrawler
-- Coordinator
-- Logical ScrapeJob lifecycle
-- Retry lifecycle
-- Deferred retry scheduler
-- Pending user-action store
-- Runtime job state
-- Shared HTTP client architecture
+RequestManager
 
----
+Crawlee RequestQueue
 
-## ✅ Access Layer
+BasicCrawler
+
+Coordinator
+
+Logical ScrapeJob lifecycle
+
+Retry lifecycle
+
+Deferred retry scheduler
+
+Pending user-action store
+
+Runtime job state
+
+Shared HTTP client architecture
+
+Parser lifecycle integration
+
+Coordinator → ParserPipeline integration
+
+✅ Access Layer
 
 AccessController supports:
 
-```text
 ALLOW
 RETRY_LATER
 USER_ACTION_REQUIRED
 DENY
-```
 
-Current access handling includes:
+Current handling includes:
 
-- Rate limits / 429
-- Authentication requirements
-- Forbidden responses
-- CAPTCHA/security challenges
-- Login requirements
-- Redirect analysis
-- Network/transport failures
-- Retry scheduling
-- Human-action pausing and resuming
+Rate limits / 429
+
+Authentication requirements
+
+Forbidden responses
+
+CAPTCHA/security challenges
+
+Login requirements
+
+Redirect analysis
+
+Network/transport failures
+
+Retry scheduling
+
+Human-action pausing and resuming
 
 Access failure is intentionally kept separate from parser failure.
 
----
+✅ Fetch Layer
 
-## ✅ Fetch Layer
+FastFetcher produces a structured FetchEnvelope preserving:
 
-FastFetcher produces a structured:
+Requested URL
 
-```text
-FetchEnvelope
-```
+Final URL
 
-It preserves information such as:
+HTTP method
 
-- URL
-- HTTP method
-- Status code
-- Headers
-- Final URL
-- Redirect chain
-- Timing
-- Response body
-- Body truncation
-- Content length
-- Transport errors
-- Body-read errors
+Status code
 
----
+Headers
 
-# Universal Requested Schema
+Redirect chain
+
+Timing
+
+Raw response body
+
+Body byte count
+
+Body truncation state
+
+Content length
+
+Transport errors
+
+Body-read errors
+
+Universal Requested Schema
 
 Each scraping job defines its requested fields dynamically through:
 
-```text
 RequestedField[]
-```
 
 Example:
 
-```ts
 {
     name: 'price',
     type: 'number',
     aliases: ['salePrice', 'currentPrice'],
     paths: ['offers.price'],
-    required: true
+    required: true,
 }
-```
 
 Supported types:
 
-```text
 string
 number
 boolean
 array
-```
 
 There are no fixed business-specific output fields.
 
----
-
-# Universal Structured Data Discovery
+Universal Deterministic Data Discovery
 
 Current deterministic extractors output:
 
-```text
 DiscoveredProperty[]
-```
 
 Extraction is intentionally separated from requested-field matching.
 
----
+✅ JSON-LD Extractor
 
-## ✅ JSON-LD Extractor
+Supports arbitrary JSON-LD structures including nested objects, arrays, @graph, Schema.org types, and custom structures.
 
-Supports arbitrary JSON-LD structures including:
+Example paths:
 
-- Product
-- JobPosting
-- Article
-- Organization
-- Person
-- Event
-- Nested objects
-- Arrays
-- `@graph`
-- Custom Schema.org structures
-
-Example discovered paths:
-
-```text
 $.offers.price
 $.hiringOrganization.name
 $.address.addressLocality
-```
 
----
+✅ Meta Extractor
 
-## ✅ Meta Extractor
+Discovers generic metadata such as:
 
-Discovers metadata such as:
-
-```text
 title
 description
 author
@@ -219,39 +227,55 @@ og:description
 twitter:title
 twitter:description
 article:author
-```
 
-Metadata stays field-agnostic until FieldMatcher runs.
+✅ Microdata Extractor
 
----
+Supports generic itemscope, itemtype, and itemprop structures, including nested objects.
 
-## ✅ Microdata Extractor
+✅ DOM Extractor — Phase 11 Complete
 
-Supports:
+The universal DOM extractor discovers field-agnostic values from rendered/static HTML using:
 
-```text
-itemscope
-itemtype
-itemprop
-```
+Semantic IDs/classes
 
-Including nested Microdata structures such as:
+data-* attributes
 
-- Product
-- JobPosting
-- Article
-- Organization
-- PostalAddress
-- AggregateRating
-- Custom item types
+Generic data-field / data-value
 
----
+dt / dd
 
-# ✅ FieldMatcher
+Tables
+
+Labels and form values
+
+Sibling label/value pairs
+
+time[datetime]
+
+Semantic anchors
+
+Headings
+
+Stable CSS paths
+
+Duplicate suppression
+
+Hidden-element filtering
+
+Utility/generated identifier filtering
+
+Generic container-noise suppression
+
+Bounded scans and warnings
+
+Phase 11 refinements also prevent false positives from large container text and heading-to-sibling misclassification.
+
+Verified: 28 DOM extractor tests passing.
+
+✅ FieldMatcher
 
 FieldMatcher connects:
 
-```text
 RequestedField[]
         +
 DiscoveredProperty[]
@@ -259,66 +283,38 @@ DiscoveredProperty[]
 DefaultFieldMatcher
         ↓
 FieldExtraction[]
-```
 
 Matching priority:
 
-```text
 1. Explicit path
 2. Exact field name
 3. Explicit alias
 4. Normalized identifier
 5. Conservative synonym mapping
-```
-
-Example:
-
-```text
-Requested:
-price
-
-Discovered:
-$.offers.price = 24999
-
-Result:
-price → 24999
-```
 
 Multiple candidates are preserved for FieldResolver.
 
----
-
-# ✅ ParserOrchestrator
+✅ ParserOrchestrator
 
 ParserOrchestrator:
 
-- Runs supported deterministic extractors
-- Aggregates discovered properties
-- Aggregates extractor warnings
-- Calls FieldMatcher
-- Groups candidates by requested field
-- Calculates missing fields
+Runs supported deterministic extractors
 
-Output:
+Aggregates discovered properties
 
-```text
-ExtractionResult
-```
+Aggregates warnings
 
-Parser statuses:
+Calls FieldMatcher
 
-```text
-PARSED
-PARTIAL
-NO_DATA
-```
+Groups candidates by requested field
 
-Flow:
+Calculates missing fields
 
-```text
+Current deterministic parser flow:
+
 FetchEnvelope
     ↓
-JSON-LD / Meta / Microdata
+JSON-LD / Meta / Microdata / DOM
     ↓
 DiscoveredProperty[]
     ↓
@@ -327,34 +323,19 @@ FieldMatcher
 FieldExtraction[]
     ↓
 ExtractionResult
-```
 
----
-
-# ✅ FieldResolver
-
-Different extraction sources may return multiple candidates.
-
-Example:
-
-```text
-price
-├── JSON-LD      24999
-├── Microdata   "24999"
-└── Meta         25999
-```
+✅ FieldResolver
 
 Resolution rules:
 
-```text
 1. Highest confidence wins
 2. If confidence ties → source priority
 3. If still tied → first candidate wins
-```
 
-Source tie-breaking priority:
+Current source tie-break priority:
 
-```text
+NETWORK
+    ↓
 JSON_LD
     ↓
 MICRODATA
@@ -362,128 +343,39 @@ MICRODATA
 META
     ↓
 DOM
-```
 
-Output:
+NETWORK is reserved for Phase 14 extraction and is not yet connected to ParserOrchestrator.
 
-```text
-ResolvedExtraction
-```
+✅ Normalizer
 
----
+Normalizer converts resolved values according to requested type using conservative deterministic rules.
 
-# ✅ Normalizer
+Supported requested types:
 
-Normalizer converts resolved values according to the requested type.
+string
 
-Example:
+number
 
-```text
-Requested:
-price: number
+boolean
 
-Resolved:
-"24999"
+array (string[] currently)
 
-Normalized:
-24999
-```
+✅ Validator
 
-Normalizer v1 intentionally uses conservative rules.
+Validation statuses:
 
-### String
-
-```text
-"Acme" → "Acme"
-24999   → "24999"
-true    → "true"
-```
-
-### Number
-
-Accepted:
-
-```text
-"24999" → 24999
-"-42.5" → -42.5
-".75"   → 0.75
-"1e3"   → 1000
-```
-
-Rejected:
-
-```text
-₹24,999
-$19.99
-1,234
-24k
-12 lakh
-NaN
-Infinity
-```
-
-### Boolean
-
-Accepted:
-
-```text
-true
-false
-"true"
-"false"
-```
-
-### Array
-
-Currently supports:
-
-```text
-string[]
-```
-
-No automatic comma splitting or scalar wrapping is performed.
-
----
-
-# ✅ Validator
-
-Validator determines whether the requested schema was successfully satisfied.
-
-Statuses:
-
-```text
 VALID
 PARTIAL
 INVALID
-```
 
-### VALID
+VALID — every requested field is valid.
 
-Every requested field is valid.
+PARTIAL — every required field is valid, but optional fields may be missing/invalid.
 
-### PARTIAL
+INVALID — a required field is missing/invalid, or no requested field is valid.
 
-Every required field is valid, but one or more optional fields are missing or invalid.
+✅ DefaultParserPipeline
 
-### INVALID
-
-A required field is missing/invalid, or no requested field is valid.
-
-Validation issues distinguish:
-
-```text
-MISSING_REQUIRED_FIELD
-NORMALIZATION_FAILED
-TYPE_MISMATCH
-```
-
----
-
-# ✅ DefaultParserPipeline
-
-The deterministic parser components are now connected through one pipeline:
-
-```text
 ParserInput
     ↓
 ParserOrchestrator
@@ -501,182 +393,365 @@ NormalizedExtraction
 Validator
     ↓
 ValidationResult
-```
 
-The pipeline returns:
+The pipeline preserves each stage for future diagnostics, failure classification, self-healing analysis, and parser-version comparison.
 
-```text
-ParserPipelineResult
-```
+✅ ParserOutcomePolicy
 
-which preserves every stage for future:
+Validation
 
-- Monitoring
-- Diagnostics
-- Failure classification
-- Self-healing analysis
-- Parser version comparison
+Outcome
 
----
+Quality
 
-# ✅ ParserOutcomePolicy
-
-Validation quality is kept separate from lifecycle state.
-
-Current policy:
-
-| Validation | Outcome | Quality |
-|---|---|---|
-| `VALID` | `COMPLETE` | `FULL` |
-| `PARTIAL` | `COMPLETE` | `PARTIAL` |
-| `INVALID` | `PARSER_FAILURE` | — |
-
-Therefore:
-
-```text
 VALID
-    ↓
-COMPLETE / FULL
+
+COMPLETE
+
+FULL
 
 PARTIAL
-    ↓
-COMPLETE / PARTIAL
+
+COMPLETE
+
+PARTIAL
 
 INVALID
-    ↓
+
 PARSER_FAILURE
-```
 
-`PARTIAL` is not automatically treated as job failure if all required fields succeeded.
+—
 
-`INVALID` also does **not** automatically trigger AI/self-healing.
+PARTIAL is not treated as job failure if all required fields are valid.
 
----
+INVALID does not automatically trigger retry, AI, or self-healing.
 
-# 🚧 Currently Working On
+✅ Phase 10 — Parser Lifecycle / Coordinator Integration
 
-## Parser Lifecycle Integration
+The parser pipeline is now connected to the request lifecycle.
 
-The next lifecycle state is:
-
-```text
-PARSER_FAILED
-```
-
-It represents:
-
-> The page was accessed successfully, but the deterministic parser pipeline could not satisfactorily validate the requested schema.
-
-Expected transition:
-
-```text
 PROCESSING
     ↓
-Fetch allowed
+Access allowed
+    ↓
+READY_FOR_PARSING
     ↓
 ParserPipeline
     ↓
 ParserOutcomePolicy
-    ↓
-PARSER_FAILURE
-    ↓
-PARSER_FAILED
-```
+    ├─ COMPLETE → SUCCESS
+    └─ PARSER_FAILURE → PARSER_FAILED
 
-`PARSER_FAILED` must not automatically:
+PARSER_FAILED means:
 
-```text
-retry
-trigger AI
-trigger self-healing
-modify access retry counters
-become FAILED_FINAL
-```
+The page was accessed successfully, but the deterministic parser pipeline could not satisfactorily validate the requested schema.
 
-The next step after this lifecycle checkpoint is integrating the ParserPipeline into Coordinator.
+PARSER_FAILED does not automatically:
 
----
+Retry
 
-# 📌 Still To Build
+Trigger AI
+
+Trigger self-healing
+
+Modify access retry counters
+
+Become FAILED_FINAL
+
+Local real-HTTP end-to-end tests verify:
+
+VALID → SUCCESS
+
+PARTIAL → SUCCESS
+
+INVALID → PARSER_FAILED
+
+✅ Phase 11 — Universal DOM Extraction
+
+Completed and verified with:
+
+DOM extractor tests: 28 / 28
+
+A real public static-site smoke test also confirmed useful generic DOM discovery without requested-field-specific logic.
+
+✅ Phase 12 — Playwright Dynamic Renderer
+
+Implemented a browser-rendering layer using real Chromium.
+
+Capabilities:
+
+domcontentloaded default wait strategy
+
+Configurable settle time
+
+Configurable timeout
+
+Headless/headed execution
+
+Final URL capture
+
+Rendered HTML capture
+
+Page title capture
+
+Redirect handling
+
+Typed browser errors
+
+Browser cleanup without masking primary failures
+
+Verified browser behaviors:
+
+✓ Static HTML rendering
+✓ JavaScript DOM mutations
+✓ API-driven dynamic content
+✓ Redirect final URL
+✓ Typed navigation timeout
+
+A real public Instagram smoke test confirmed that Chromium could render and read real public profile content without clicking login or performing authentication.
+
+✅ Phase 13 — Browser Evidence Collector
+
+The Playwright renderer now also passively captures browser network evidence generated during page load.
+
+Captured evidence is limited to browser xhr and fetch responses.
+
+Network evidence contract
+
+Each retained network response can include:
+
+URL
+
+HTTP status
+
+Request method
+
+Resource type (xhr / fetch)
+
+Normalized response headers
+
+Content-Type
+
+Body byte count
+
+Textual response body when safely retained
+
+Reason when a body is omitted
+
+Safety and memory controls
+
+Implemented:
+
+Max responses per render        200
+Max body per response           1 MiB
+Max total retained body data    4 MiB
+Body-read timeout               2 seconds
+
+Additional protections:
+
+Binary bodies are not retained
+
+Streaming responses are not retained
+
+Sensitive response headers are redacted
+
+Async response-body tasks are explicitly drained before returning
+
+Evidence collection never intentionally crashes an otherwise successful render
+
+Response-limit truncation is reported
+
+Phase 13 test coverage
+
+Verified:
+
+✓ Captures JSON fetch responses
+✓ Keeps binary metadata without binary body
+✓ Enforces per-response body limit
+✓ Enforces total body budget
+✓ Normalizes headers
+✓ Redacts sensitive headers
+✓ Captures redirect response + final API response
+✓ Bounds retained API response count
+
+Real public smoke result
+
+Against a real public Instagram profile:
+
+Observed browser responses:   70
+Eligible XHR/fetch:            18
+Retained responses:            18
+Bodies captured:               18
+Retained body bytes:       106877
+Response limit reached:     false
+4xx/5xx API responses:          0
+
+The smoke test discovered real browser traffic including GraphQL/XHR calls.
+
+Important Phase 13 discovery
+
+Some structured API responses were returned with:
+
+Content-Type: text/javascript
+Content-Type: application/x-javascript
+
+instead of application/json.
+
+Therefore Phase 14 must not trust Content-Type alone when detecting structured data. It must inspect retained bodies and attempt safe deterministic parsing.
+
+🚧 Phase 14 — Universal Network/API Data Extractor
+
+✅ Step 14A — Contracts Complete
+
+Completed contracts:
+
+NetworkExtractionResult
+
+NetworkDataExtractor
+
+New extraction source: NETWORK
+
+Resolver source priority updated to include NETWORK
+
+Design rules locked in:
+
+Field-agnostic extraction
+
+No site-specific endpoint logic
+
+No GraphQL endpoint assumptions
+
+No requested-field logic inside the extractor
+
+Content-Type is only a hint
+
+Structured-data detection will be based on safe body inspection/parsing
+
+Already-captured Phase 13 evidence is read-only input
+
+Current status:
+
+Step 14A contracts      ✅ Complete
+Step 14B implementation 📌 Next
+Step 14C integration    📌 Later
+
+Planned Step 14B responsibilities:
+
+Safe structured-payload detection
+
+Anti-XSSI prefix handling
+
+JSON object/array parsing
+
+Generic recursive traversal
+
+Indexed paths for object arrays
+
+Primitive leaf-array support
+
+GraphQL __* metadata suppression
+
+Depth/property/node safety limits
+
+Duplicate suppression
+
+Meaningful warnings only
+
+Ordinary non-structured text silently skipped
+
+Support structured bodies even when Content-Type is text/javascript or similar
+
+📌 Still To Build
 
 Major remaining components:
 
-- Complete parser lifecycle integration
-- ParserPipeline integration with Coordinator
-- Parser failure classification
-- DOM Extractor
-- Playwright dynamic rendering fallback
-- Self-healing engine
-- AI-generated parser configurations/selectors
-- Healing validation
-- Parser configuration version management
-- Promotion / rollback
-- Monitoring dashboard
-- Persistent/distributed retry scheduler
-- Production persistence
+Phase 14B — DefaultNetworkDataExtractor
 
----
+Phase 14C — Network extraction integration into parser flow
 
-# Development Progress
+Browser/Coordinator dynamic fallback decision logic
 
-```text
-✅ Phase 1  — Crawling & Access Foundation
-✅ Phase 2  — Universal Structured Data Discovery
-✅ Phase 3  — FieldMatcher
-✅ Phase 4  — ParserOrchestrator
-✅ Phase 5  — FieldResolver
-✅ Phase 6  — Normalizer
-✅ Phase 7  — Validator
-✅ Phase 8  — Parser Pipeline
-✅ Phase 9  — Parser Outcome Policy
+Collection/list record grouping
 
-🚧 Phase 10 — Parser Lifecycle / Coordinator Integration
+Browser action discovery
 
-📌 Phase 11 — DOM Extraction
-📌 Phase 12 — Playwright Fallback
-📌 Phase 13 — Failure Classification
-📌 Phase 14 — Self-Healing
-📌 Phase 15 — Monitoring & Production Persistence
-```
+Browser action execution
 
----
+Goal/action planner
 
-# Current Verified Baseline
+Observe → Extract → Validate → Plan → Act loop
 
-```text
-Test Files: 17 passed
-Tests:      131 passed
-Failures:   0
+Browser safety / loop bounds
 
-TypeScript Typecheck: PASS
-Build: PASS
-```
+Failure classification
 
-> Parser lifecycle changes currently being added are not included in this verified 131-test baseline yet.
+AI self-healing engine
 
----
+AI-generated parser/action configurations
 
-# Tech Stack
+Healing validation
 
-- Node.js
-- TypeScript
-- Crawlee
-- Crawlee BasicCrawler
-- Crawlee RequestQueue
-- GotScraping HTTP client
-- Playwright
-- Cheerio
-- Vitest
+Learned strategy persistence/reuse
 
-Playwright is installed but browser fallback is **not yet connected to the parser pipeline**.
+Parser/action version management
 
----
+Promotion / rollback
 
-# Full System Architecture
+Monitoring dashboard
 
-```mermaid
+Persistent/distributed retry scheduler
+
+Production persistence
+
+Browser pooling/reuse optimization
+
+Development Progress
+
+✅ Phase 1   — Crawling & Access Foundation
+✅ Phase 2   — Universal Structured Data Discovery
+✅ Phase 3   — FieldMatcher
+✅ Phase 4   — ParserOrchestrator
+✅ Phase 5   — FieldResolver
+✅ Phase 6   — Normalizer
+✅ Phase 7   — Validator
+✅ Phase 8   — Parser Pipeline
+✅ Phase 9   — Parser Outcome Policy
+✅ Phase 10  — Parser Lifecycle / Coordinator Integration
+✅ Phase 11  — Universal DOM Extraction
+✅ Phase 12  — Playwright Dynamic Renderer
+✅ Phase 13  — Browser Evidence Collector
+🚧 Phase 14  — Universal Network/API Data Extraction
+   ✅ 14A   — Contracts
+   📌 14B   — DefaultNetworkDataExtractor
+   📌 14C   — Parser integration later
+📌 Phase 15  — Browser Action Discovery
+📌 Phase 16  — Browser Action Executor
+📌 Phase 17  — Goal / Action Planner
+📌 Phase 18  — Observe → Extract → Validate → Plan → Act Loop
+📌 Phase 19  — Generic Navigation Strategies
+📌 Phase 20  — Browser Safety / Loop Bounds
+📌 Phase 21  — Failure Classification
+📌 Phase 22  — AI Self-Healing Browser Agent
+📌 Phase 23  — Learned Strategy Persistence / Reuse / Versioning
+
+Current Verified Baseline
+
+Test Files:              22 passed
+Tests:                  179 passed
+Failures:                 0
+TypeScript Typecheck:  PASS
+Build:                 PASS
+
+Current verified browser/network tests include:
+
+Playwright renderer tests:          5 / 5
+Browser network-evidence tests:     7 / 7
+DOM extractor tests:               28 / 28
+Local parser runtime E2E tests:      3 / 3
+
+Current Architecture
+
 flowchart TD
-
     A["Agent Scrape Request"]
     B["ScrapeJob<br/>RequestedField[]"]
     C["RequestManager"]
@@ -685,324 +760,66 @@ flowchart TD
     F["Coordinator"]
     G["AccessController"]
     H{"Access Decision"}
-
-    R1["RETRY_LATER"]
-    R2["USER_ACTION_REQUIRED"]
-    R3["DENY"]
-
     I["FastFetcher"]
     J["FetchEnvelope"]
 
-    K["JSON-LD Extractor ✅"]
-    L["Meta Extractor ✅"]
-    M["Microdata Extractor ✅"]
-    M2["DOM Extractor 📌"]
+    K["JSON-LD ✅"]
+    L["Meta ✅"]
+    M["Microdata ✅"]
+    N["DOM ✅"]
+    O["DiscoveredProperty[]"]
+    P["FieldMatcher ✅"]
+    Q["FieldResolver ✅"]
+    R["Normalizer ✅"]
+    S["Validator ✅"]
+    T["ParserOutcomePolicy ✅"]
+    U{"Parser Outcome"}
+    V["SUCCESS"]
+    W["PARSER_FAILED"]
 
-    N["DiscoveredProperty[] ✅"]
-    O["FieldMatcher ✅"]
-    P["FieldExtraction[]"]
+    X["PlaywrightRenderer ✅"]
+    Y["Rendered HTML ✅"]
+    Z["NetworkEvidenceCollector ✅"]
+    AA["XHR / Fetch Evidence ✅"]
+    AB["NetworkDataExtractor 🚧"]
+    AC["NETWORK DiscoveredProperty[] 📌"]
 
-    Q["ParserOrchestrator ✅"]
-    R["ExtractionResult"]
+    AD["Failure Classification 📌"]
+    AE["Self-Healing 📌"]
 
-    S["FieldResolver ✅"]
-    T["ResolvedExtraction"]
-
-    U["Normalizer ✅"]
-    V["NormalizedExtraction"]
-
-    W["Validator ✅"]
-    X["ValidationResult"]
-
-    Y["ParserOutcomePolicy ✅"]
-    Z{"Parser Outcome"}
-
-    AA["COMPLETE<br/>FULL / PARTIAL"]
-    AB["PARSER_FAILURE"]
-
-    AC["SUCCESS"]
-    AD["PARSER_FAILED 🚧"]
-
-    AE["Failure Classification 📌"]
-    AF["Playwright / DOM Evidence 📌"]
-    AG["Self-Healing Engine 📌"]
-    AH["Generated Parser Configuration 📌"]
-    AI["Deterministic Validation 📌"]
-    AJ["Version / Promotion 📌"]
-
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    F --> G
-    G --> H
-
+    A --> B --> C --> D --> E --> F --> G --> H
     H -->|ALLOW| I
-    H -->|RETRY_LATER| R1
-    H -->|USER_ACTION_REQUIRED| R2
-    H -->|DENY| R3
+    H -->|RETRY_LATER| C
+    H -->|USER_ACTION_REQUIRED| C
+    H -->|DENY| W
 
     I --> J
-
     J --> K
     J --> L
     J --> M
-    J -. future .-> M2
-
-    K --> N
-    L --> N
-    M --> N
-    M2 -. future .-> N
-
+    J --> N
+    K --> O
+    L --> O
+    M --> O
     N --> O
-    O --> P
-
-    P --> Q
-    Q --> R
-
-    R --> S
-    S --> T
-
-    T --> U
-    U --> V
-
-    V --> W
-    W --> X
+    O --> P --> Q --> R --> S --> T --> U
+    U -->|VALID / PARTIAL| V
+    U -->|INVALID| W
 
     X --> Y
-    Y --> Z
-
-    Z -->|VALID| AA
-    Z -->|PARTIAL| AA
-    Z -->|INVALID| AB
-
-    AA --> AC
-    AB --> AD
-
-    AD -. future .-> AE
-    AE -. extraction issue .-> AF
-    AF --> AG
-    AG --> AH
-    AH --> AI
-
-    AI -->|PASS| AJ
-    AI -->|FAIL| AG
-```
-
----
-
-# AccessController Decision Flow
-
-```mermaid
-flowchart TD
-
-    A["Coordinator receives request"]
-    B["Preflight access evaluation"]
-    C{"Preflight Decision"}
-
-    D["FastFetcher"]
-    E["FetchEnvelope"]
-
-    F["Post-fetch access evaluation"]
-    G{"Access Decision"}
-
-    H["ALLOW<br/>Continue to parsing"]
-    I["RETRY_LATER<br/>Schedule delayed retry"]
-    J["USER_ACTION_REQUIRED<br/>Pause for external action"]
-    K["DENY<br/>Stop execution"]
-
-    A --> B
-    B --> C
-
-    C -->|ALLOW| D
-    C -->|RETRY_LATER| I
-    C -->|USER_ACTION_REQUIRED| J
-    C -->|DENY| K
-
-    D --> E
-    E --> F
-    F --> G
-
-    G -->|ALLOW| H
-    G -->|RETRY_LATER| I
-    G -->|USER_ACTION_REQUIRED| J
-    G -->|DENY| K
-```
-
----
-
-# Universal Parser Flow
-
-```mermaid
-flowchart TD
-
-    A["FetchEnvelope"]
-
-    B["JSON-LD Extractor ✅"]
-    C["Meta Extractor ✅"]
-    D["Microdata Extractor ✅"]
-    E["DOM Extractor 📌"]
-
-    F["DiscoveredProperty[] ✅"]
-
-    G["FieldMatcher ✅"]
-    H["FieldExtraction[]"]
-
-    I["ParserOrchestrator ✅"]
-    J["ExtractionResult"]
-
-    K["FieldResolver ✅"]
-    L["ResolvedExtraction"]
-
-    M["Normalizer ✅"]
-    N["NormalizedExtraction"]
-
-    O["Validator ✅"]
-    P["ValidationResult"]
-
-    Q["ParserOutcomePolicy ✅"]
-
-    R["COMPLETE / FULL"]
-    S["COMPLETE / PARTIAL"]
-    T["PARSER_FAILURE"]
-
-    A --> B
-    A --> C
-    A --> D
-    A -. future .-> E
-
-    B --> F
-    C --> F
-    D --> F
-    E -. future .-> F
-
-    F --> G
-    G --> H
-
-    H --> I
-    I --> J
-
-    J --> K
-    K --> L
-
-    L --> M
-    M --> N
-
-    N --> O
-    O --> P
-
-    P --> Q
-
-    Q -->|VALID| R
-    Q -->|PARTIAL| S
-    Q -->|INVALID| T
-```
-
----
-
-# Retry + Human Action Lifecycle
-
-```mermaid
-flowchart TD
-
-    A["PROCESSING"]
-    B{"Access Condition"}
-
-    C["RATE_LIMITED"]
-    D["RETRY_SCHEDULED"]
-    E["DeferredRetryScheduler"]
-    F["Requeue Existing Job"]
-    G["Same ScrapeJob.id<br/>Fresh Crawlee request identity"]
-
-    H["CAPTCHA / Login / Challenge"]
-    I["USER_ACTION_REQUIRED"]
-    J["PendingActionStore"]
-    K["Human Action"]
-    L["Resume"]
-    M["Same ScrapeJob.id<br/>Fresh execution"]
-
-    A --> B
-
-    B -->|Rate Limited| C
-    C --> D
-    D --> E
-    E --> F
-    F --> G
-    G --> A
-
-    B -->|User Action Needed| H
-    H --> I
-    I --> J
-    J --> K
-    K --> L
-    L --> M
-    M --> A
-```
-
----
-
-# Parser Failure Lifecycle
-
-```mermaid
-flowchart TD
-
-    A["ValidationResult"]
-    B{"Validation Status"}
-
-    C["VALID"]
-    D["PARTIAL"]
-    E["INVALID"]
-
-    F["COMPLETE<br/>Quality = FULL"]
-    G["COMPLETE<br/>Quality = PARTIAL"]
-    H["PARSER_FAILURE"]
-
-    I["SUCCESS"]
-    J["PARSER_FAILED"]
-
-    K["Failure Classification 📌"]
-
-    L["Extraction / Matching Failure"]
-    M["Normalization / Data Failure"]
-    N["Internal Type Contract Failure"]
-
-    O["Possible Self-Healing 📌"]
-    P["Normalization Strategy 📌"]
-    Q["Internal Investigation 📌"]
-
-    A --> B
-
-    B -->|VALID| C
-    B -->|PARTIAL| D
-    B -->|INVALID| E
-
-    C --> F
-    D --> G
-    E --> H
-
-    F --> I
-    G --> I
-    H --> J
-
-    J -. future .-> K
-
-    K --> L
-    K --> M
-    K --> N
-
-    L -. future .-> O
-    M -. future .-> P
-    N -. future .-> Q
-```
-
----
-
-# Important Engineering Principle
+    X --> Z
+    Z --> AA
+    AA --> AB
+    AB --> AC
+    AC -. future parser integration .-> P
+
+    W -. future .-> AD
+    AD -. healable .-> AE
+
+Important Engineering Principles
 
 Agentic Loop intentionally separates:
 
-```text
 ACCESS FAILURE
         ≠
 PARSER FAILURE
@@ -1010,103 +827,74 @@ PARSER FAILURE
 NORMALIZATION FAILURE
         ≠
 VALIDATION FAILURE
-```
+        ≠
+BROWSER / NETWORK EVIDENCE COLLECTION
 
 Examples of access problems:
 
-```text
 429
 CAPTCHA
 403
 network timeout
-```
 
 Examples of parser/extraction problems:
 
-```text
 required field missing
 incorrect extraction candidate
 website structure changed
-```
 
 Example normalization/data problem:
 
-```text
 "Salary not disclosed" → requested number
-```
 
 These failures should not all trigger the same retry or healing strategy.
 
----
+Self-Healing Vision
 
-# Self-Healing Vision
+Self-healing is not implemented yet.
 
-Self-healing is **not implemented yet**.
+Future flow:
 
-The future architecture is:
-
-```mermaid
 flowchart TD
-
     A["Parser Failure"]
     B["Failure Classification"]
     C{"Healable?"}
-
     D["Collect Evidence"]
-
-    E["DOM"]
-    F["Network"]
-    G["Existing Extraction Evidence"]
-    H["Browser Evidence"]
-
+    E["DOM Evidence"]
+    F["Network/API Evidence"]
+    G["Browser Evidence"]
+    H["Existing Extraction Evidence"]
     I["AI Healing Engine"]
-    J["Generate Parser Configuration / Selectors"]
-
+    J["Generate Parser / Action Configuration"]
     K["Deterministic Test"]
     L["Validator"]
     M{"Valid?"}
-
-    N["Promote Parser Version"]
+    N["Promote Version"]
     O["Reject Candidate"]
 
-    A --> B
-    B --> C
-
+    A --> B --> C
     C -->|No| O
     C -->|Yes| D
-
     D --> E
     D --> F
     D --> G
     D --> H
-
     E --> I
     F --> I
     G --> I
     H --> I
-
-    I --> J
-    J --> K
-    K --> L
-    L --> M
-
+    I --> J --> K --> L --> M
     M -->|Yes| N
     M -->|No| O
-```
 
-Core principle:
+Deterministic first. AI last. Validate before promotion.
 
-> **Deterministic first. AI last. Validate before promotion.**
+AI should generate parser/action configurations and selectors rather than blindly rewriting production source code.
 
-AI should generate parser configurations/selectors rather than blindly rewriting production source code.
+Monitoring Foundation
 
----
+Current runtime state includes:
 
-# Monitoring Foundation
-
-Current runtime monitoring information includes:
-
-```text
 status
 attempt
 deferredRetryCount
@@ -1114,96 +902,117 @@ domain
 lastAccessReason
 lastError
 updatedAt
-```
 
 Future monitoring will include:
 
-- Active jobs
-- Success rate
-- Parser failure rate
-- Retry rate
-- 429 rate
-- CAPTCHA rate
-- Average scrape duration
-- Missing-field rate
-- Normalization failure rate
-- Validation failure rate
-- Healing attempts
-- Healing success rate
-- Domain health
-- Parser version health
+Active jobs
 
-A dedicated monitoring dashboard is still planned.
+Success rate
 
----
+Parser failure rate
 
-# Run Project
+Retry rate
+
+429 rate
+
+CAPTCHA rate
+
+Average scrape duration
+
+Missing-field rate
+
+Normalization failure rate
+
+Validation failure rate
+
+Browser-render fallback rate
+
+Network-evidence capture rate
+
+Healing attempts
+
+Healing success rate
+
+Domain health
+
+Parser/action version health
+
+Tech Stack
+
+Node.js
+
+TypeScript
+
+Crawlee
+
+Crawlee BasicCrawler
+
+Crawlee RequestQueue
+
+GotScraping HTTP client
+
+Playwright / Chromium
+
+Cheerio
+
+Vitest
+
+Playwright and Browser Evidence Collector are implemented and tested, but dynamic-browser fallback is not yet connected to Coordinator/parser fallback logic.
+
+Run Project
 
 Install dependencies:
 
-```bash
 npm install
-```
 
 Install Playwright Chromium:
 
-```bash
 npm run browser:install
-```
 
-Run development mode:
+Development mode:
 
-```bash
 npm run dev
-```
 
-Run verification:
+Verification:
 
-```bash
 npm run typecheck
 npm test
 npm run build
-```
 
----
+Current Status
 
-# Current Status
+Core crawling infrastructure             ✅ Complete
+Access-control foundation                ✅ Complete
+Fast fetching                            ✅ Complete
+Universal structured discovery           ✅ Complete
+FieldMatcher                             ✅ Complete
+ParserOrchestrator                       ✅ Complete
+FieldResolver                            ✅ Complete
+Normalizer                               ✅ Complete
+Validator                                ✅ Complete
+DefaultParserPipeline                    ✅ Complete
+ParserOutcomePolicy                      ✅ Complete
+Parser lifecycle integration             ✅ Complete
+Coordinator parser integration           ✅ Complete
+Universal DOM extraction                 ✅ Complete
+Playwright dynamic renderer              ✅ Complete
+Browser network evidence collector       ✅ Complete
+Network extractor contracts (14A)        ✅ Complete
+DefaultNetworkDataExtractor (14B)        📌 Next
+Network parser integration (14C)         📌 Later
+Browser dynamic fallback integration     📌 Planned
+Failure classification                   📌 Planned
+Self-healing                             📌 Planned
+Monitoring dashboard                     📌 Planned
 
-```text
-Core crawling infrastructure       ✅ Complete
-Access-control foundation          ✅ Complete
-Fast fetching                      ✅ Complete
-Universal structured discovery     ✅ Complete
-FieldMatcher                       ✅ Complete
-ParserOrchestrator                 ✅ Complete
-FieldResolver                      ✅ Complete
-Normalizer                         ✅ Complete
-Validator                          ✅ Complete
-DefaultParserPipeline              ✅ Complete
-ParserOutcomePolicy                ✅ Complete
+Current Verified Baseline
 
-Parser lifecycle integration       🚧 In Progress
-Coordinator parser integration     📌 Next
-DOM extraction                     📌 Planned
-Playwright fallback                📌 Planned
-Failure classification             📌 Planned
-Self-healing                       📌 Planned
-Monitoring dashboard               📌 Planned
-```
-
----
-
-## Current Verified Baseline
-
-```text
-17 test files
-131 tests
-131 / 131 passing
-
+22 test files
+179 tests
+179 / 179 passing
 TypeScript Typecheck: PASS
 Build: PASS
-```
 
-The project now has a complete **deterministic universal parsing pipeline**.
+The project now has a complete deterministic static/DOM parsing foundation, a verified real Chromium renderer, and a bounded browser-network evidence collector.
 
-The immediate next work is connecting parser outcomes safely into the RequestManager lifecycle and Coordinator before moving to DOM/browser fallback and self-healing.
+The immediate next work is Phase 14B — DefaultNetworkDataExtractor, which will convert captured API/network bodies into universal field-agnostic DiscoveredProperty[] before any parser integration is attempted.
