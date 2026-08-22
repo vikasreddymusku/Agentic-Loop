@@ -920,6 +920,7 @@ Playwright is installed but browser fallback is not yet connected to the parser 
 
 Full System Architecture
 
+```mermaid
 
 flowchart TD
 
@@ -1090,11 +1091,11 @@ flowchart TD
     AI -->|PASS| AJ
 
     AI -->|FAIL| AG
-
+```
 
 AccessController Decision Flow
 
-
+```mermaid
 flowchart TD
 
     A["Coordinator receives request"]
@@ -1144,11 +1145,11 @@ flowchart TD
     G -->|USER_ACTION_REQUIRED| J
 
     G -->|DENY| K
-
+```
 
 Universal Parser Flow
 
-
+```mermaid
 flowchart TD
 
     A["FetchEnvelope"]
@@ -1234,11 +1235,11 @@ flowchart TD
     Q -->|PARTIAL| S
 
     Q -->|INVALID| T
-
+```
 
 Retry + Human Action Lifecycle
 
-
+```mermaid
 flowchart TD
 
     A["PROCESSING"]
@@ -1295,10 +1296,10 @@ flowchart TD
 
     M --> A
 
-
+```
 Parser Failure Lifecycle
 
-
+```mermaid
 flowchart TD
 
     A["ValidationResult"]
@@ -1368,7 +1369,7 @@ flowchart TD
     M -. future .-> P
 
     N -. future .-> Q
-
+```
 
 Important Engineering Principle
 
@@ -1426,7 +1427,7 @@ Self-healing is not implemented yet.
 
 The future architecture is:
 
-
+```mermaid
 flowchart TD
 
     A["Parser Failure"]
@@ -1494,7 +1495,7 @@ flowchart TD
     M -->|Yes| N
 
     M -->|No| O
-
+```
 
 Core principle:
 
