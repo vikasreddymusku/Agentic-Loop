@@ -419,6 +419,82 @@ describe(
 
 
         it(
+    'prefers JSON_LD over NETWORK when confidence values are equal',
+    () => {
+
+        const resolver =
+            new DefaultFieldResolver();
+
+
+        const result =
+            resolver.resolve(
+                extractionResult({
+
+                    candidates: {
+
+                        title: [
+
+                            /**
+                             * NETWORK deliberately comes first.
+                             *
+                             * This proves resolution is based on
+                             * source authority rather than array
+                             * insertion order.
+                             */
+                            candidate({
+
+                                field:
+                                    'title',
+
+                                value:
+                                    'Network title',
+
+                                confidence:
+                                    0.95,
+
+                                source:
+                                    'NETWORK',
+                            }),
+
+                            candidate({
+
+                                field:
+                                    'title',
+
+                                value:
+                                    'JSON-LD title',
+
+                                confidence:
+                                    0.95,
+
+                                source:
+                                    'JSON_LD',
+                            }),
+                        ],
+                    },
+                }),
+            );
+
+
+        expect(
+            result.resolved.title
+                ?.value,
+        ).toBe(
+            'JSON-LD title',
+        );
+
+
+        expect(
+            result.resolved.title
+                ?.evidence.source,
+        ).toBe(
+            'JSON_LD',
+        );
+    },
+);
+
+
+        it(
             'preserves the first candidate when confidence and source are tied',
             () => {
 

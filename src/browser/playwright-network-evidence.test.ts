@@ -726,6 +726,31 @@ describe(
                         },
                     );
 
+                    /**
+ * Every retained network response must have
+ * a non-empty provenance ID.
+ */
+expect(
+    api?.id
+        .trim()
+        .length,
+)
+    .toBeGreaterThan(
+        0,
+    );
+
+
+/**
+ * Sequence records the original browser
+ * response observation order.
+ */
+expect(
+    api?.sequence,
+)
+    .toBeGreaterThanOrEqual(
+        0,
+    );
+
 
                 expect(
                     api?.body,
@@ -1129,6 +1154,50 @@ describe(
                     .toContain(
                         'redirected-data',
                     );
+
+                    const ids =
+    result.networkResponses.map(
+        (
+            response,
+        ) =>
+            response.id,
+    );
+
+
+expect(
+    new Set(
+        ids,
+    ).size,
+)
+    .toBe(
+        ids.length,
+    );
+
+
+const sequences =
+    result.networkResponses.map(
+        (
+            response,
+        ) =>
+            response.sequence,
+    );
+
+
+expect(
+    sequences,
+)
+    .toEqual(
+        [
+            ...sequences,
+        ].sort(
+            (
+                left,
+                right,
+            ) =>
+                left
+                - right,
+        ),
+    );
             },
 
             20_000,

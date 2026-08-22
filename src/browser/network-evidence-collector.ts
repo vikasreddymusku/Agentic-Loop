@@ -16,6 +16,10 @@ import type {
     NetworkResponse,
 } from '../core/contracts/browser/network-response.js';
 
+import {
+    randomUUID,
+} from 'node:crypto';
+
 
 const DEFAULT_MAX_RESPONSES =
     200;
@@ -67,6 +71,9 @@ export class NetworkEvidenceCollector {
 
     private readonly bodyReadTimeoutMs:
         number;
+
+    private readonly captureId =
+        randomUUID();
 
 
     private page:
@@ -346,17 +353,27 @@ export class NetworkEvidenceCollector {
                 1;
 
 
-            let task:
-                Promise<void>;
+            /**
+ * Identity is assigned immediately when the
+ * response is observed, before asynchronous
+ * body reading begins.
+ */
+const responseId =
+    `${this.captureId}:${sequence}`;
 
 
-            task =
-                this.captureResponse(
-                    response,
-                    sequence,
-                    request.method(),
-                    resourceType,
-                )
+let task:
+    Promise<void>;
+
+
+task =
+    this.captureResponse(
+        response,
+        sequence,
+        responseId,
+        request.method(),
+        resourceType,
+    )
                     .catch(
                         () => {
 
@@ -389,6 +406,9 @@ export class NetworkEvidenceCollector {
 
         sequence:
             number,
+
+        responseId:
+            string,
 
         method:
             string,
@@ -441,6 +461,12 @@ export class NetworkEvidenceCollector {
         const collected:
             NetworkResponse =
         {
+
+            id:
+                responseId,
+
+            sequence,
+            
             url:
                 response.url(),
 

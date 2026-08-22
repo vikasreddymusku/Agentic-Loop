@@ -27,20 +27,22 @@ import type {
  * Confidence always remains the primary signal.
  */
 const SOURCE_PRIORITY:
-    Readonly<Record<ExtractionSource, number>> = {
+    Record<ExtractionSource, number> = {
 
-        NETWORK: 5,
         JSON_LD:
-            3,
+            5,
 
         MICRODATA:
-            2,
+            4,
 
         META:
-            1,
+            3,
+
+        NETWORK:
+            2,
 
         DOM:
-            0,
+            1,
     };
 
 

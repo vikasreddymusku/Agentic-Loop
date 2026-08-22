@@ -69,6 +69,18 @@ export type DiscoveredProperty = {
         string;
 
     /**
+     * Opaque reference to the exact source evidence
+     * item that produced this property.
+     *
+     * Interpretation depends on `source`.
+     *
+     * For NETWORK properties this contains the
+     * originating NetworkResponse.id.
+     */
+    sourceRef?:
+        string;
+
+    /**
      * Diagnostic preview only.
      *
      * Extractors must keep this at or below

@@ -14,67 +14,52 @@ export type NetworkBodyOmissionReason =
 
 
 export type NetworkResponse = {
-    /**
-     * Response URL.
-     */
-    url: string;
 
     /**
-     * HTTP response status.
+     * Globally unique identity for this exact
+     * captured network-response instance.
+     *
+     * This must not contain URL, headers,
+     * body data, or other sensitive values.
      */
-    status: number;
+    id:
+        string;
 
     /**
-     * HTTP request method which produced
-     * this response.
+     * Zero-based observation order among the
+     * eligible XHR/fetch responses captured by
+     * this NetworkEvidenceCollector instance.
+     *
+     * This represents observation order, not
+     * asynchronous body-read completion order.
      */
-    method: string;
+    sequence:
+        number;
 
-    /**
-     * Phase 13 only retains API-oriented
-     * browser requests.
-     */
+    url:
+        string;
+
+    status:
+        number;
+
+    method:
+        string;
+
     resourceType:
         NetworkResourceType;
 
-    /**
-     * Header names are normalized to
-     * lowercase.
-     *
-     * Sensitive header values are redacted.
-     */
     headers:
-        Record<
-            string,
-            string
-        >;
+        Record<string, string>;
 
-    /**
-     * Original Content-Type header when
-     * available.
-     */
-    contentType?: string;
+    contentType?:
+        string;
 
-    /**
-     * Known body size.
-     *
-     * When Content-Length is available this
-     * may be known without reading the body.
-     */
-    bodyBytes?: number;
+    bodyBytes?:
+        number;
 
-    /**
-     * Textual response body.
-     *
-     * Binary bodies are intentionally never
-     * retained.
-     */
-    body?: string;
+    body?:
+        string;
 
-    /**
-     * Explains why an otherwise eligible
-     * response did not retain its body.
-     */
     bodyOmittedReason?:
         NetworkBodyOmissionReason;
 };
